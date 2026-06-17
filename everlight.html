@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Evenlight — a quiet tribute from photos and a song</title>
+<title>EverLight — a quiet tribute from photos and a song</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -30,7 +30,7 @@
   .mast{text-align:center;margin:14px 0 30px}
   .mast .mark{font-family:var(--display);font-weight:500;font-size:clamp(34px,6vw,52px);letter-spacing:.01em;line-height:1;margin:0}
   .mast .mark .dot{color:var(--gold)}
-  .mast .sub{color:var(--muted);margin:12px auto 0;max-width:46ch;font-size:15px}
+  .mast .sub{color:var(--muted);margin:12px auto 0;max-width:48ch;font-size:15px}
 
   .stage-shell{position:relative;border-radius:18px;overflow:hidden;background:var(--stage);aspect-ratio:16/9;box-shadow:0 30px 80px -30px rgba(0,0,0,.8), inset 0 0 0 1px var(--line)}
   .stage-shell:fullscreen{border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
@@ -55,14 +55,19 @@
   .empty h2{font-family:var(--display);font-weight:500;font-size:26px;color:var(--text);margin:0 0 6px}
   .empty p{margin:0;max-width:34ch}
 
-  /* recording overlay */
+  /* lock badge on the stage */
+  .lock-badge{position:absolute;right:12px;bottom:12px;display:flex;align-items:center;gap:7px;background:rgba(8,9,13,.62);border:1px solid var(--line-2);color:#f1ece3;font-size:12px;padding:7px 11px;border-radius:99px;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);z-index:4}
+  .lock-badge svg{width:13px;height:13px;color:var(--gold)}
+  .lock-badge.hide{display:none}
+
+  /* recording / render overlay */
   .rec{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,9,13,.92);text-align:center;padding:24px;z-index:5}
   .rec.show{display:flex}
   .rec canvas{max-width:62%;max-height:46%;border-radius:8px;box-shadow:0 10px 40px -12px rgba(0,0,0,.7);background:#000}
   .rec .label{font-family:var(--display);font-size:24px;margin:18px 0 4px}
-  .rec .note{color:var(--muted);font-size:13px;max-width:36ch}
+  .rec .note{color:var(--muted);font-size:13px;max-width:40ch}
   .rec .bar{width:min(360px,70%);height:5px;border-radius:99px;background:var(--bg-3);margin:16px 0 14px;overflow:hidden}
-  .rec .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),#f0d09a)}
+  .rec .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),#f0d09a);transition:width .15s linear}
 
   .transport{display:flex;align-items:center;gap:14px;margin:16px 2px 0}
   .scrub{flex:1;height:4px;border-radius:99px;background:var(--bg-3);position:relative;cursor:pointer}
@@ -78,6 +83,12 @@
   .btn.primary:hover{background:#ecc27e}
   .btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);background:var(--bg-2)}
   .btn svg{width:16px;height:16px}
+  .btn .lk{width:13px;height:13px;opacity:.85}
+
+  .exportnote{text-align:center;color:var(--muted-2);font-size:12.5px;margin-top:10px;min-height:1em}
+  .unlock-pill{display:none;align-items:center;justify-content:center;gap:7px;color:var(--gold);font-size:12.5px;margin-top:8px}
+  .unlock-pill.show{display:flex}
+  .unlock-pill svg{width:14px;height:14px}
 
   .panels{margin-top:40px;display:grid;gap:18px}
   @media(min-width:760px){.panels{grid-template-columns:1fr 1fr}.panel.full{grid-column:1/-1}}
@@ -88,9 +99,9 @@
   label.field{display:block;margin-bottom:14px}
   label.field:last-child{margin-bottom:0}
   .field span{display:block;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-  input[type=text]{width:100%;background:var(--bg-3);border:1px solid var(--line);color:var(--text);padding:11px 13px;border-radius:10px;font-family:var(--ui);font-size:15px}
-  input[type=text]:focus{outline:none;border-color:var(--gold)}
-  input[type=text]::placeholder{color:var(--muted-2)}
+  input[type=text],input[type=email],input[type=password]{width:100%;background:var(--bg-3);border:1px solid var(--line);color:var(--text);padding:11px 13px;border-radius:10px;font-family:var(--ui);font-size:15px}
+  input[type=text]:focus,input[type=email]:focus,input[type=password]:focus{outline:none;border-color:var(--gold)}
+  input[type=text]::placeholder,input[type=email]::placeholder,input[type=password]::placeholder{color:var(--muted-2)}
 
   .drop{border:1.5px dashed var(--line-2);border-radius:12px;padding:26px 18px;text-align:center;color:var(--muted);transition:border-color .2s,background .2s;cursor:pointer}
   .drop:hover,.drop.over{border-color:var(--gold);background:var(--gold-soft);color:var(--text)}
@@ -143,9 +154,36 @@
 
   .privacy{display:flex;align-items:center;gap:9px;justify-content:center;color:var(--muted);font-size:13px;margin-top:30px}
   .privacy svg{width:15px;height:15px;color:var(--gold);flex:0 0 auto}
-  .exportnote{text-align:center;color:var(--muted-2);font-size:12.5px;margin-top:10px;min-height:1em}
 
   footer{text-align:center;color:var(--muted-2);font-size:12.5px;margin-top:40px}
+
+  /* ---------- paywall modal ---------- */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(8,9,13,.74);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:20px;z-index:60}
+  .modal-backdrop.show{display:flex}
+  .modal{width:100%;max-width:448px;background:linear-gradient(180deg,var(--bg-2),var(--bg));border:1px solid var(--line-2);border-radius:20px;padding:26px 26px 22px;position:relative;box-shadow:0 40px 120px -30px rgba(0,0,0,.9);max-height:92vh;overflow:auto}
+  .modal-x{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--bg-3);color:var(--muted);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .modal-x:hover{color:var(--text);border-color:var(--gold)}
+  .pay-eyebrow{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--gold);text-align:center;font-weight:600}
+  .modal h2{font-family:var(--display);font-weight:600;font-size:30px;text-align:center;margin:8px 0 6px;letter-spacing:.01em}
+  .pay-sub{color:var(--muted);text-align:center;margin:0 auto 18px;max-width:36ch;font-size:14px}
+  .pay-price{text-align:center;margin:0 0 16px}
+  .pay-price .amt{font-family:var(--display);font-size:46px;color:var(--text);font-weight:600;line-height:1}
+  .pay-price .per{color:var(--muted);font-size:14px;margin-left:8px}
+  .pay-perks{list-style:none;padding:0;margin:0 0 20px;display:grid;gap:10px}
+  .pay-perks li{position:relative;padding-left:28px;font-size:13.5px;color:var(--text)}
+  .pay-perks li:before{content:'';position:absolute;left:0;top:0;width:18px;height:18px;border-radius:50%;background:var(--gold-soft)}
+  .pay-perks li:after{content:'';position:absolute;left:6px;top:4px;width:5px;height:9px;border-right:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:rotate(40deg)}
+  .pay-tabs{display:flex;gap:6px;background:var(--bg-3);padding:4px;border-radius:12px;margin-bottom:16px}
+  .pay-tab{flex:1;border:none;background:transparent;color:var(--muted);padding:9px;border-radius:9px;font-size:13.5px;font-weight:500;transition:background .15s,color .15s}
+  .pay-tab.on{background:var(--bg-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.05)}
+  .pay-pane[hidden]{display:none}
+  .pay-go{width:100%;justify-content:center;margin-top:6px;font-size:15px;padding:13px}
+  .pay-go:disabled{opacity:.75}
+  .pay-alt{text-align:center;color:var(--muted);font-size:12.5px;margin-top:12px}
+  .pay-alt a{color:var(--gold);text-decoration:none;cursor:pointer}
+  .pay-err{color:#e08a82;font-size:13px;text-align:center;min-height:1.1em;margin-top:9px}
+  .pay-secure{color:var(--muted-2);font-size:11.5px;text-align:center;margin-top:14px;line-height:1.55;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .pay-secure b{color:var(--muted);font-weight:600}
 
   @media (prefers-reduced-motion:reduce){.empty .glow{animation:none}}
 </style>
@@ -154,8 +192,8 @@
 <div class="wrap">
 
   <header class="mast">
-    <h1 class="mark">Even<span class="dot">light</span></h1>
-    <p class="sub">A quiet tribute, made from a few photographs and the songs that mattered. Everything stays on this device.</p>
+    <h1 class="mark">Ever<span class="dot">Light</span></h1>
+    <p class="sub">A quiet tribute, made from a few photographs and the songs that mattered. Build it here, then unlock it to watch on any device or keep a copy forever.</p>
   </header>
 
   <div class="stage-shell" id="stage">
@@ -166,11 +204,15 @@
       <h2>Begin with their photographs</h2>
       <p>Add the images you'd like to remember below. They'll play slowly, set to your songs.</p>
     </div>
+    <div class="lock-badge hide" id="lockBadge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      Locked · unlock to watch
+    </div>
     <div class="rec" id="rec">
       <canvas id="recCanvas" width="1280" height="720"></canvas>
       <div class="label" id="recLabel">Rendering your tribute…</div>
       <div class="bar"><i id="recBar"></i></div>
-      <div class="note">Keep this tab open and in front. Recording happens in real time, so it takes about as long as the tribute itself.</div>
+      <div class="note" id="recNote">Building a high-quality MP4, frame by frame. You can keep using the page — this happens here on your device.</div>
       <button class="btn" id="recCancel" style="margin-top:16px">Cancel</button>
     </div>
   </div>
@@ -200,6 +242,10 @@
     </button>
   </div>
   <div class="exportnote" id="exportNote"></div>
+  <div class="unlock-pill" id="unlockPill">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    Unlocked — watch and download anytime on this device
+  </div>
 
   <div class="panels">
 
@@ -256,10 +302,46 @@
 
   <div class="privacy">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-    Nothing is uploaded. Your photos and songs never leave this device.
+    Your photos and songs are never uploaded — they stay on this device. The video is made right here in your browser.
   </div>
 
-  <footer>Evenlight · a working draft · rename and reshape it however you like.</footer>
+  <footer>EverLight · a working draft · rename and reshape it however you like.</footer>
+</div>
+
+<!-- ---------- paywall ---------- -->
+<div class="modal-backdrop" id="payModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <button class="modal-x" id="payClose" aria-label="Close">&times;</button>
+    <div class="pay-eyebrow">EverLight</div>
+    <h2 id="payTitle">Unlock your tribute</h2>
+    <p class="pay-sub">Watch it on any device, and download a keepsake copy you can play anywhere.</p>
+    <div class="pay-price"><span class="amt" id="payAmt">$19</span><span class="per">one-time</span></div>
+    <ul class="pay-perks">
+      <li>Unlimited playback on your phone, computer, and TV</li>
+      <li>Download a universal <b>MP4</b> that plays everywhere</li>
+      <li>Yours to keep forever — no subscription</li>
+    </ul>
+
+    <div class="pay-tabs">
+      <button class="pay-tab on" data-tab="guest" type="button">Pay as guest</button>
+      <button class="pay-tab" data-tab="signin" type="button">Sign in</button>
+    </div>
+
+    <div class="pay-pane" data-pane="guest">
+      <label class="field"><span>Email for your receipt</span><input type="email" id="guestEmail" placeholder="you@example.com" autocomplete="email"></label>
+    </div>
+    <div class="pay-pane" data-pane="signin" hidden>
+      <label class="field"><span>Email</span><input type="email" id="signinEmail" placeholder="you@example.com" autocomplete="email"></label>
+      <label class="field"><span>Password</span><input type="password" id="signinPass" placeholder="••••••••" autocomplete="current-password"></label>
+    </div>
+
+    <button class="btn primary pay-go" id="payGo" type="button">Pay <span id="payGoAmt">$19</span> securely</button>
+    <div class="pay-err" id="payErr"></div>
+    <div class="pay-secure">
+      <span><b>Demo checkout</b> — no real charge is made.</span>
+      <span>Connect a payment provider (e.g. Stripe) to accept live payments.</span>
+    </div>
+  </div>
 </div>
 
 <audio id="audio" crossorigin="anonymous"></audio>
@@ -268,6 +350,10 @@
 (function(){
   "use strict";
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- product / pricing ----------
+  var PRICE_LABEL='$19';          // change to set your price label
+  var ACCESS_KEY='everlight_access_v1';
 
   // ---------- state ----------
   var photos=[];           // {id,url,caption}
@@ -285,7 +371,8 @@
   var audio=$('audio');
   var playBtn=$('playBtn'),playLabel=$('playLabel'),restartBtn=$('restartBtn'),fsBtn=$('fsBtn'),dlBtn=$('dlBtn');
   var scrub=$('scrub'),fill=$('fill'),tCur=$('tCur'),tTot=$('tTot'),exportNote=$('exportNote');
-  var rec=$('rec'),recCanvas=$('recCanvas'),recBar=$('recBar'),recLabel=$('recLabel'),recCancel=$('recCancel');
+  var rec=$('rec'),recCanvas=$('recCanvas'),recBar=$('recBar'),recLabel=$('recLabel'),recNote=$('recNote'),recCancel=$('recCancel');
+  var lockBadge=$('lockBadge'),unlockPill=$('unlockPill');
 
   var slots=[slotA,slotB],front=0;
 
@@ -364,7 +451,7 @@
     paintAt(elapsed); raf=requestAnimationFrame(tick);
   }
 
-  // ---------- music playlist ----------
+  // ---------- music playlist (preview) ----------
   var trackIdx=0, musicActive=false;
   function loadTrack(i){ trackIdx=i; if(tracks[i]){ audio.src=tracks[i].url; } }
   function startMusic(){ if(!tracks.length) return; musicActive=true; loadTrack(0);
@@ -406,16 +493,34 @@
     fill.style.width='0%'; tCur.textContent='0:00';
     if(photos.length) play();
   }
-  playBtn.addEventListener('click',function(){ playing?pause():play(); });
-  restartBtn.addEventListener('click',restart);
-  fsBtn.addEventListener('click',function(){
-    if(document.fullscreenElement) document.exitFullscreen();
-    else if(stage.requestFullscreen) stage.requestFullscreen();
-    else if(stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
-    else setNote('Full-screen isn\u2019t supported in this browser.');
+
+  // playback is gated behind the paywall
+  playBtn.addEventListener('click',function(){
+    if(playing){ pause(); return; }
+    if(!requireAccess('play')) return;
+    play();
   });
+  restartBtn.addEventListener('click',function(){
+    if(!requireAccess('play')) return;
+    restart();
+  });
+  fsBtn.addEventListener('click',function(){
+    if(document.fullscreenElement){ document.exitFullscreen(); return; }
+    if(!requireAccess('present')) return;
+    presentNow();
+  });
+  function presentNow(){
+    try{
+      if(stage.requestFullscreen) stage.requestFullscreen();
+      else if(stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
+      else setNote('Full-screen isn’t supported in this browser.');
+    }catch(e){}
+    if(!playing) play();
+  }
   scrub.addEventListener('click',function(e){
-    if(!total) return; var r=scrub.getBoundingClientRect();
+    if(!total) return;
+    if(!requireAccess('play')) return;
+    var r=scrub.getBoundingClientRect();
     var frac=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
     buildScenes(); playheadBase=frac*total; curScene=-1;
     enterScene(sceneAt(playheadBase),true); paintAt(playheadBase);
@@ -448,7 +553,7 @@
       var x=document.createElement('button'); x.className='x'; x.innerHTML='&times;'; x.title='Remove';
       x.addEventListener('click',function(){ URL.revokeObjectURL(p.url); photos.splice(i,1); renderThumbs(); updateButtons(); });
       ph.appendChild(idx); ph.appendChild(x);
-      var cap=document.createElement('input'); cap.type='text'; cap.placeholder='A few words\u2026'; cap.value=p.caption; cap.maxLength=80;
+      var cap=document.createElement('input'); cap.type='text'; cap.placeholder='A few words…'; cap.value=p.caption; cap.maxLength=80;
       cap.addEventListener('input',function(){ p.caption=cap.value; });
       var mv=document.createElement('div'); mv.className='move';
       var up=document.createElement('button'); up.innerHTML='&#8592; earlier'; up.disabled=(i===0);
@@ -507,8 +612,346 @@
   }
   wireToggle($('tgDed'),'dedication'); wireToggle($('tgClose'),'closing'); wireToggle($('tgKB'),'kb');
 
-  // ---------- export (canvas + MediaRecorder) ----------
-  var audioGraph=null, exporting=false, cancelExport=false;
+  // ================= PAYWALL =================
+  var payModal=$('payModal'),payClose=$('payClose'),payGo=$('payGo'),payErr=$('payErr');
+  var guestEmail=$('guestEmail'),signinEmail=$('signinEmail'),signinPass=$('signinPass');
+  var access=loadAccess();   // {paid:bool, email, ts, mode}
+  var pendingAction=null;    // 'play' | 'present' | 'download'
+  var currentTab='guest';
+
+  function loadAccess(){
+    try{ var a=JSON.parse(localStorage.getItem(ACCESS_KEY)); if(a&&a.paid) return a; }catch(e){}
+    return {paid:false};
+  }
+  function saveAccess(){ try{ localStorage.setItem(ACCESS_KEY,JSON.stringify(access)); }catch(e){} }
+
+  // Gate: returns true if already unlocked, otherwise opens the paywall and returns false.
+  function requireAccess(action){
+    if(access.paid) return true;
+    openPaywall(action);
+    return false;
+  }
+  function openPaywall(action){
+    pendingAction=action||null;
+    payErr.textContent='';
+    payModal.classList.add('show'); payModal.setAttribute('aria-hidden','false');
+    var f=currentTab==='guest'?guestEmail:signinEmail;
+    setTimeout(function(){ try{ f.focus(); }catch(e){} },60);
+  }
+  function closePaywall(){ payModal.classList.remove('show'); payModal.setAttribute('aria-hidden','true'); }
+  function setTab(t){
+    currentTab=t;
+    Array.prototype.forEach.call(document.querySelectorAll('.pay-tab'),function(b){ b.classList.toggle('on',b.getAttribute('data-tab')===t); });
+    Array.prototype.forEach.call(document.querySelectorAll('.pay-pane'),function(p){ p.hidden=(p.getAttribute('data-pane')!==t); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.pay-tab'),function(b){
+    b.addEventListener('click',function(){ setTab(b.getAttribute('data-tab')); payErr.textContent=''; });
+  });
+  payClose.addEventListener('click',closePaywall);
+  payModal.addEventListener('click',function(e){ if(e.target===payModal) closePaywall(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&payModal.classList.contains('show')) closePaywall(); });
+
+  function validEmail(v){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v); }
+
+  payGo.addEventListener('click',function(){ doPay(); });
+  function doPay(){
+    var email;
+    if(currentTab==='guest'){
+      email=(guestEmail.value||'').trim();
+    }else{
+      email=(signinEmail.value||'').trim();
+      if(!signinPass.value){ payErr.textContent='Enter your password.'; signinPass.focus(); return; }
+    }
+    if(!validEmail(email)){ payErr.textContent='Please enter a valid email address.'; return; }
+    payErr.textContent='';
+    var orig=payGo.innerHTML; payGo.disabled=true; payGo.textContent='Processing…';
+    processPayment({email:email,mode:currentTab,amount:PRICE_LABEL}).then(function(){
+      access={paid:true,email:email,ts:Date.now(),mode:currentTab};
+      saveAccess(); applyAccessUI();
+      payGo.textContent='✓ Unlocked';
+      setTimeout(function(){
+        closePaywall(); payGo.disabled=false; payGo.innerHTML=orig;
+        runPending();
+      },650);
+    }).catch(function(){
+      payErr.textContent='Payment could not be completed. Please try again.';
+      payGo.disabled=false; payGo.innerHTML=orig;
+    });
+  }
+
+  // ---- Payment integration seam -------------------------------------------
+  // This is a SIMULATED checkout so the flow works out of the box with no
+  // backend. To accept real payments, replace the body below with a call to
+  // your payment provider (e.g. redirect to Stripe Checkout / Payment Element)
+  // and resolve only after your server confirms the charge succeeded.
+  function processPayment(info){
+    return new Promise(function(resolve){ setTimeout(resolve,1200); });
+  }
+  // -------------------------------------------------------------------------
+
+  function runPending(){
+    var a=pendingAction; pendingAction=null;
+    if(a==='play') play();
+    else if(a==='present') presentNow();
+    else if(a==='download') startExport();
+  }
+  function applyAccessUI(){
+    lockBadge.classList.toggle('hide',!!access.paid);
+    unlockPill.classList.toggle('show',!!access.paid);
+  }
+
+  // ================= EXPORT (accurate MP4) =================
+  // The old approach recorded the screen in real time with MediaRecorder,
+  // which dropped frames and drifted. We now render every frame deterministically
+  // and encode H.264 + AAC into a real .mp4 with WebCodecs, so the output is
+  // frame-accurate and plays on phones, computers and TVs. MediaRecorder is
+  // kept only as a fallback for browsers without WebCodecs.
+
+  var exporting=false, cancelExport=false;
+  var EXP_W=1920, EXP_H=1080, FPS=30, VBITRATE=8000000;
+
+  var _muxerMod=null;
+  function loadMuxer(){
+    if(_muxerMod) return _muxerMod;
+    _muxerMod=import('https://esm.sh/mp4-muxer@5.2.1');
+    return _muxerMod;
+  }
+
+  function preloadImages(){
+    return Promise.all(photos.map(function(p){
+      return new Promise(function(res){ var im=new Image(); im.onload=function(){res({id:p.id,img:im});}; im.onerror=function(){res({id:p.id,img:null});}; im.src=p.url; });
+    })).then(function(list){ var m={}; list.forEach(function(o){ m[o.id]=o.img; }); return m; });
+  }
+  function fitContain(iw,ih,cw,ch){ var s=Math.min(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
+  function fitCover(iw,ih,cw,ch){ var s=Math.max(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
+
+  // Draw one scene onto a 2D context (shared by export + the small preview).
+  function drawSceneCanvas(ctx,CW,CH,imgMap,idx,localT,ga){
+    var sc=scenes[idx]; ctx.save(); ctx.globalAlpha=ga;
+    if(sc.type==='photo'){
+      var img=imgMap[sc.photo.id];
+      ctx.fillStyle='#0b0c11'; ctx.fillRect(0,0,CW,CH);
+      if(img){
+        try{ ctx.filter='blur(22px) brightness(0.42)'; }catch(e){}
+        var cov=fitCover(img.width,img.height,CW,CH);
+        ctx.drawImage(img,cov.dx-CW*0.06,cov.dy-CH*0.06,cov.dw*1.12,cov.dh*1.12);
+        ctx.filter='none';
+        var p=kb(idx); var f=sc.dur>0?Math.min(1,localT/sc.dur):1;
+        var s=settings.kb?(p.s0+(p.s1-p.s0)*f):1.04;
+        var px=settings.kb?(p.x0+(p.x1-p.x0)*f):0, py=settings.kb?(p.y0+(p.y1-p.y0)*f):0;
+        ctx.save(); ctx.translate(CW/2,CH/2); ctx.scale(s,s); ctx.translate(px*CW/100,py*CH/100); ctx.translate(-CW/2,-CH/2);
+        var con=fitContain(img.width,img.height,CW,CH); ctx.drawImage(img,con.dx,con.dy,con.dw,con.dh); ctx.restore();
+      }
+      if(sc.photo.caption){
+        var g=ctx.createLinearGradient(0,CH*0.7,0,CH); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle=g; ctx.fillRect(0,CH*0.7,CW,CH*0.3);
+        ctx.fillStyle='#fbf7ef'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+        ctx.font='italic 500 '+Math.round(CH*0.045)+'px "Cormorant Garamond", serif';
+        ctx.fillText(sc.photo.caption, CW/2, CH-CH*0.06, CW*0.86);
+      }
+    }else{
+      var rg=ctx.createRadialGradient(CW/2,CH*0.32,0,CW/2,CH*0.32,CW*0.8);
+      rg.addColorStop(0,'#15161d'); rg.addColorStop(1,'#0b0c11'); ctx.fillStyle=rg; ctx.fillRect(0,0,CW,CH);
+      var cl=function(x){return Math.max(0,Math.min(1,x));};
+      var aEye=cl((localT-0.15)/1.0), aName=cl((localT-0.35)/1.1), aRule=cl((localT-0.8)/1.6), aDate=cl((localT-1.0)/1.0);
+      var name=settings.name||'Their name';
+      var eyebrow=(sc.type==='ded')?(settings.line||''):'Always remembered';
+      var dates=(sc.type==='ded')?(settings.dates||''):'';
+      ctx.textAlign='center';
+      ctx.save(); ctx.globalAlpha=ga*aEye; ctx.fillStyle='#E0B36A';
+      ctx.font='600 '+Math.round(CH*0.026)+'px "DM Sans", sans-serif';
+      try{ ctx.letterSpacing=(CH*0.011)+'px'; }catch(e){}
+      var eyY=(sc.type==='ded')?CH*0.36:CH*0.52;
+      ctx.fillText(eyebrow.toUpperCase(), CW/2, eyY); try{ctx.letterSpacing='0px';}catch(e){} ctx.restore();
+      ctx.save(); ctx.globalAlpha=ga*aName; ctx.fillStyle='#F1ECE3';
+      ctx.font='500 '+Math.round(CH*0.13)+'px "Cormorant Garamond", serif';
+      var nmY=(sc.type==='ded')?CH*0.5:CH*0.45; ctx.fillText(name, CW/2, nmY, CW*0.86); ctx.restore();
+      var ruleY=(sc.type==='ded')?CH*0.57:CH*0.52, maxW=CW*0.32, w=maxW*aRule;
+      var lg=ctx.createLinearGradient(CW/2-w/2,0,CW/2+w/2,0);
+      lg.addColorStop(0,'rgba(224,179,106,0)'); lg.addColorStop(0.5,'rgba(224,179,106,'+ga+')'); lg.addColorStop(1,'rgba(224,179,106,0)');
+      ctx.fillStyle=lg; ctx.fillRect(CW/2-w/2,ruleY,w,Math.max(1,CH*0.0016));
+      if(dates){ ctx.save(); ctx.globalAlpha=ga*aDate; ctx.fillStyle='#9CA0AD';
+        ctx.font='500 '+Math.round(CH*0.038)+'px "Cormorant Garamond", serif';
+        ctx.fillText(dates, CW/2, CH*0.64); ctx.restore(); }
+    }
+    ctx.restore();
+  }
+
+  // Paint the whole frame for an absolute time, including the cross-fade.
+  function paintFrame(ctx,CW,CH,imgMap,elapsed){
+    ctx.clearRect(0,0,CW,CH); ctx.fillStyle='#000'; ctx.fillRect(0,0,CW,CH);
+    var idx=sceneAt(elapsed), sc=scenes[idx], localT=elapsed-sc.start;
+    var fadeWin=Math.min(FADE,sc.dur*0.6), alpha=(localT<fadeWin)?(localT/fadeWin):1;
+    if(idx>0 && alpha<1) drawSceneCanvas(ctx,CW,CH,imgMap,idx-1,scenes[idx-1].dur,1);
+    drawSceneCanvas(ctx,CW,CH,imgMap,idx,localT,alpha);
+  }
+
+  // ---- support checks ----
+  function canEncodeAVC(){
+    if(typeof VideoEncoder==='undefined') return Promise.resolve(null);
+    var cands=['avc1.640028','avc1.4D4028','avc1.42E028','avc1.640020','avc1.42001f'];
+    var i=0;
+    function next(){
+      if(i>=cands.length) return Promise.resolve(null);
+      var codec=cands[i++];
+      return VideoEncoder.isConfigSupported({codec:codec,width:EXP_W,height:EXP_H,bitrate:VBITRATE,framerate:FPS})
+        .then(function(r){ return (r&&r.supported)?codec:next(); })
+        .catch(function(){ return next(); });
+    }
+    return next();
+  }
+  function canEncodeAAC(sampleRate,channels){
+    if(typeof AudioEncoder==='undefined') return Promise.resolve(false);
+    return AudioEncoder.isConfigSupported({codec:'mp4a.40.2',sampleRate:sampleRate,numberOfChannels:channels,bitrate:192000})
+      .then(function(r){ return !!(r&&r.supported); }).catch(function(){ return false; });
+  }
+  function waitForQueue(enc,max){
+    return new Promise(function(res){
+      (function check(){ if(cancelExport||enc.encodeQueueSize<=max) return res(); setTimeout(check,4); })();
+    });
+  }
+
+  // Render all songs into one mixed PCM buffer (with fades) using OfflineAudioContext.
+  function renderMixedAudio(totalDur){
+    var sr=48000;
+    var len=Math.max(1,Math.ceil(totalDur*sr));
+    var OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+    if(!OAC) return Promise.resolve(null);
+    var octx=new OAC(2,len,sr);
+    var master=octx.createGain();
+    var g=master.gain, VOL=AUDIO_VOL;
+    g.setValueAtTime(0,0);
+    g.linearRampToValueAtTime(VOL,Math.min(AUDIO_IN,totalDur));
+    var outStart=Math.max(Math.min(AUDIO_IN,totalDur),totalDur-AUDIO_OUT);
+    g.setValueAtTime(VOL,outStart);
+    g.linearRampToValueAtTime(0,totalDur);
+    master.connect(octx.destination);
+
+    var off=0, chain=Promise.resolve();
+    tracks.forEach(function(tk){
+      chain=chain.then(function(){
+        if(off>=totalDur) return;
+        return fetch(tk.url).then(function(r){return r.arrayBuffer();}).then(function(buf){
+          return octx.decodeAudioData(buf.slice(0));
+        }).then(function(decoded){
+          var s=octx.createBufferSource(); s.buffer=decoded; s.connect(master);
+          try{ s.start(off); }catch(e){}
+          off+=decoded.duration;
+        }).catch(function(){ /* skip undecodable track */ });
+      });
+    });
+    return chain.then(function(){ return octx.startRendering(); });
+  }
+
+  function encodeAudio(buf,muxer){
+    return new Promise(function(resolve,reject){
+      var sr=buf.sampleRate, ch=buf.numberOfChannels, N=buf.length;
+      var enc=new AudioEncoder({ output:function(c,m){ muxer.addAudioChunk(c,m); }, error:function(e){ reject(e); } });
+      enc.configure({codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ch,bitrate:192000});
+      var chans=[]; for(var c=0;c<ch;c++) chans.push(buf.getChannelData(c));
+      var block=Math.round(sr*0.1); // ~100ms blocks
+      var off=0;
+      function step(){
+        if(cancelExport){ try{enc.close();}catch(e){} return resolve(); }
+        if(off>=N){ enc.flush().then(resolve,reject); return; }
+        var len=Math.min(block,N-off);
+        var data=new Float32Array(len*ch);
+        for(var c2=0;c2<ch;c2++){ data.set(chans[c2].subarray(off,off+len), c2*len); }
+        var ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:len,numberOfChannels:ch,timestamp:Math.round(off/sr*1e6),data:data});
+        enc.encode(ad); ad.close(); off+=len;
+        if(enc.encodeQueueSize>24){ waitForQueue(enc,8).then(step); } else { Promise.resolve().then(step); }
+      }
+      step();
+    });
+  }
+
+  // The accurate path: deterministic frame rendering → WebCodecs → MP4.
+  function exportWebCodecs(){
+    var CW=EXP_W, CH=EXP_H;
+    var videoCodec, mod, imgMap, audioBuffer=null, wantAudio=false;
+    var rctx=recCanvas.getContext('2d');
+
+    return canEncodeAVC().then(function(codec){
+      if(!codec){ var e=new Error('no avc'); e.fallback=true; throw e; }
+      videoCodec=codec;
+      return loadMuxer().catch(function(){ var e=new Error('muxer load failed'); e.fallback=true; throw e; });
+    }).then(function(m){
+      mod=m;
+      recLabel.textContent='Preparing…';
+      return preloadImages();
+    }).then(function(im){
+      imgMap=im;
+      return (document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
+    }).then(function(){
+      if(!tracks.length) return null;
+      return renderMixedAudio(total).then(function(b){
+        if(!b) return null;
+        return canEncodeAAC(b.sampleRate,b.numberOfChannels).then(function(ok){
+          if(!ok){ var e=new Error('no aac'); e.fallback=true; throw e; }
+          return b;
+        });
+      });
+    }).then(function(b){
+      audioBuffer=b; wantAudio=!!b;
+
+      var Muxer=mod.Muxer, ArrayBufferTarget=mod.ArrayBufferTarget;
+      var muxOpts={
+        target:new ArrayBufferTarget(),
+        video:{codec:'avc',width:CW,height:CH,frameRate:FPS},
+        fastStart:'in-memory',
+        firstTimestampBehavior:'offset'
+      };
+      if(wantAudio) muxOpts.audio={codec:'aac',numberOfChannels:audioBuffer.numberOfChannels,sampleRate:audioBuffer.sampleRate};
+      var muxer=new Muxer(muxOpts);
+
+      var encErr=null;
+      var vEnc=new VideoEncoder({ output:function(chunk,meta){ muxer.addVideoChunk(chunk,meta); }, error:function(e){ encErr=e; } });
+      vEnc.configure({codec:videoCodec,width:CW,height:CH,bitrate:VBITRATE,framerate:FPS,latencyMode:'quality'});
+
+      var cnv=document.createElement('canvas'); cnv.width=CW; cnv.height=CH;
+      var cx=cnv.getContext('2d');
+      var frameDur=1e6/FPS;
+      var totalFrames=Math.max(1,Math.ceil(total*FPS));
+      var keyEvery=FPS*2;
+
+      recLabel.textContent='Rendering your tribute… 0%';
+      recBar.style.width='0%';
+
+      var i=0;
+      function frameLoop(){
+        if(cancelExport){ try{vEnc.close();}catch(e){} return Promise.resolve(null); }
+        if(encErr) return Promise.reject(encErr);
+        if(i>=totalFrames){
+          return vEnc.flush().then(function(){
+            if(!wantAudio) return;
+            recLabel.textContent='Adding the music…';
+            return encodeAudio(audioBuffer,muxer);
+          }).then(function(){
+            if(cancelExport) return null;
+            muxer.finalize();
+            return new Blob([muxer.target.buffer],{type:'video/mp4'});
+          });
+        }
+        var t=i/FPS;
+        paintFrame(cx,CW,CH,imgMap,t);
+        // live preview (downscaled)
+        try{ rctx.drawImage(cnv,0,0,recCanvas.width,recCanvas.height); }catch(e){}
+        var frame=new VideoFrame(cnv,{timestamp:Math.round(i*frameDur),duration:Math.round(frameDur)});
+        vEnc.encode(frame,{keyFrame:(i%keyEvery===0)});
+        frame.close();
+        var pct=Math.round(i/totalFrames*100);
+        recBar.style.width=pct+'%';
+        recLabel.textContent='Rendering your tribute… '+pct+'%';
+        i++;
+        var gate=(vEnc.encodeQueueSize>10)?waitForQueue(vEnc,4):new Promise(function(r){ setTimeout(r); });
+        return gate.then(frameLoop);
+      }
+      return frameLoop();
+    });
+  }
+
+  // Fallback: real-time MediaRecorder (used only when WebCodecs is unavailable).
+  var audioGraph=null;
   function pickMime(){
     if(typeof MediaRecorder==='undefined'||!MediaRecorder.isTypeSupported) return null;
     var cands=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4',
@@ -527,147 +970,114 @@
     }catch(e){ audioGraph=null; }
     return audioGraph;
   }
-  function preloadImages(){
-    return Promise.all(photos.map(function(p){
-      return new Promise(function(res){ var im=new Image(); im.onload=function(){res({id:p.id,img:im});}; im.onerror=function(){res({id:p.id,img:null});}; im.src=p.url; });
-    })).then(function(list){ var m={}; list.forEach(function(o){ m[o.id]=o.img; }); return m; });
+  function exportMediaRecorder(){
+    return new Promise(function(resolve,reject){
+      var mime=pickMime();
+      if(!mime){ reject(new Error('This browser can’t record video. Try Chrome, Edge, Safari or Firefox.')); return; }
+      var rctx=recCanvas.getContext('2d');
+      recLabel.textContent='Preparing…';
+      preloadImages().then(function(imgMap){
+        var ready=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
+        return ready.then(function(){ return imgMap; });
+      }).then(function(imgMap){
+        var CW=recCanvas.width, CH=recCanvas.height;
+        var stream=recCanvas.captureStream(30);
+        var haveAudio=false;
+        if(tracks.length){
+          var g=ensureAudioGraph();
+          if(g){ try{ if(g.ctx.state==='suspended') g.ctx.resume(); }catch(e){}
+            var at=g.dest.stream.getAudioTracks()[0]; if(at){ stream.addTrack(at); haveAudio=true; } }
+        }
+        var chunks=[], recorder;
+        try{ recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000}); }
+        catch(e){ reject(new Error('Couldn’t start the recorder in this browser.')); return; }
+        recorder.ondataavailable=function(ev){ if(ev.data&&ev.data.size) chunks.push(ev.data); };
+        recorder.onstop=function(){
+          if(tracks.length){ musicActive=false; try{audio.pause();}catch(e){} }
+          if(cancelExport){ resolve(null); return; }
+          var ext=(mime.indexOf('mp4')>=0)?'mp4':'webm';
+          resolve({blob:new Blob(chunks,{type:mime.split(';')[0]}),ext:ext});
+        };
+        recLabel.textContent='Rendering your tribute…';
+        recorder.start(200);
+        if(haveAudio){ musicActive=true; loadTrack(0); try{audio.currentTime=0;}catch(e){} audio.volume=0; audio.play().catch(function(){}); }
+        var startT=performance.now();
+        (function renderLoop(now){
+          if(cancelExport){ try{recorder.stop();}catch(e){} return; }
+          var elapsed=(now-startT)/1000;
+          if(elapsed>=total){ paintFrame(rctx,CW,CH,imgMap,total-0.001); try{recorder.stop();}catch(e){} return; }
+          paintFrame(rctx,CW,CH,imgMap,elapsed);
+          if(haveAudio){
+            var v=AUDIO_VOL;
+            if(elapsed<AUDIO_IN) v=AUDIO_VOL*(elapsed/AUDIO_IN);
+            else if(elapsed>total-AUDIO_OUT) v=AUDIO_VOL*Math.max(0,(total-elapsed)/AUDIO_OUT);
+            audio.volume=Math.max(0,Math.min(1,v));
+          }
+          recBar.style.width=(elapsed/total*100).toFixed(1)+'%';
+          recLabel.textContent='Rendering your tribute… '+Math.round(elapsed/total*100)+'%';
+          requestAnimationFrame(renderLoop);
+        })(startT);
+      }).catch(reject);
+    });
   }
 
-  function fitContain(iw,ih,cw,ch){ var s=Math.min(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
-  function fitCover(iw,ih,cw,ch){ var s=Math.max(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
-
-  function drawSceneCanvas(ctx,CW,CH,imgMap,idx,localT,ga){
-    var sc=scenes[idx]; ctx.save(); ctx.globalAlpha=ga;
-    if(sc.type==='photo'){
-      var img=imgMap[sc.photo.id];
-      // background fill (blurred + dark)
-      ctx.fillStyle='#0b0c11'; ctx.fillRect(0,0,CW,CH);
-      if(img){
-        try{ ctx.filter='blur(22px) brightness(0.42)'; }catch(e){}
-        var cov=fitCover(img.width,img.height,CW,CH);
-        ctx.drawImage(img,cov.dx-CW*0.06,cov.dy-CH*0.06,cov.dw*1.12,cov.dh*1.12);
-        ctx.filter='none';
-        // foreground with ken burns
-        var p=kb(idx); var f=sc.dur>0?Math.min(1,localT/sc.dur):1;
-        var s=settings.kb?(p.s0+(p.s1-p.s0)*f):1.04;
-        var px=settings.kb?(p.x0+(p.x1-p.x0)*f):0, py=settings.kb?(p.y0+(p.y1-p.y0)*f):0;
-        ctx.save(); ctx.translate(CW/2,CH/2); ctx.scale(s,s); ctx.translate(px*CW/100,py*CH/100); ctx.translate(-CW/2,-CH/2);
-        var con=fitContain(img.width,img.height,CW,CH); ctx.drawImage(img,con.dx,con.dy,con.dw,con.dh); ctx.restore();
-      }
-      if(sc.photo.caption){
-        var g=ctx.createLinearGradient(0,CH*0.7,0,CH); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.6)');
-        ctx.fillStyle=g; ctx.fillRect(0,CH*0.7,CW,CH*0.3);
-        ctx.fillStyle='#fbf7ef'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-        ctx.font='italic 500 '+Math.round(CH*0.045)+'px "Cormorant Garamond", serif';
-        ctx.fillText(sc.photo.caption, CW/2, CH-CH*0.06, CW*0.86);
-      }
-    }else{
-      // card
-      var rg=ctx.createRadialGradient(CW/2,CH*0.32,0,CW/2,CH*0.32,CW*0.8);
-      rg.addColorStop(0,'#15161d'); rg.addColorStop(1,'#0b0c11'); ctx.fillStyle=rg; ctx.fillRect(0,0,CW,CH);
-      var cl=function(x){return Math.max(0,Math.min(1,x));};
-      var aEye=cl((localT-0.15)/1.0), aName=cl((localT-0.35)/1.1), aRule=cl((localT-0.8)/1.6), aDate=cl((localT-1.0)/1.0);
-      var name=settings.name||'Their name';
-      var eyebrow=(sc.type==='ded')?(settings.line||''):'Always remembered';
-      var dates=(sc.type==='ded')?(settings.dates||''):'';
-      ctx.textAlign='center';
-      // eyebrow (letterspaced uppercase)
-      ctx.save(); ctx.globalAlpha=ga*aEye; ctx.fillStyle='#E0B36A';
-      ctx.font='600 '+Math.round(CH*0.026)+'px "DM Sans", sans-serif';
-      try{ ctx.letterSpacing=(CH*0.011)+'px'; }catch(e){}
-      var eyY=(sc.type==='ded')?CH*0.36:CH*0.52;
-      ctx.fillText(eyebrow.toUpperCase(), CW/2, eyY); try{ctx.letterSpacing='0px';}catch(e){} ctx.restore();
-      // name
-      ctx.save(); ctx.globalAlpha=ga*aName; ctx.fillStyle='#F1ECE3';
-      ctx.font='500 '+Math.round(CH*0.13)+'px "Cormorant Garamond", serif';
-      var nmY=(sc.type==='ded')?CH*0.5:CH*0.45; ctx.fillText(name, CW/2, nmY, CW*0.86); ctx.restore();
-      // rule
-      var ruleY=(sc.type==='ded')?CH*0.57:CH*0.52, maxW=CW*0.32, w=maxW*aRule;
-      var lg=ctx.createLinearGradient(CW/2-w/2,0,CW/2+w/2,0);
-      lg.addColorStop(0,'rgba(224,179,106,0)'); lg.addColorStop(0.5,'rgba(224,179,106,'+ga+')'); lg.addColorStop(1,'rgba(224,179,106,0)');
-      ctx.fillStyle=lg; ctx.fillRect(CW/2-w/2,ruleY,w,Math.max(1,CH*0.0016));
-      // dates
-      if(dates){ ctx.save(); ctx.globalAlpha=ga*aDate; ctx.fillStyle='#9CA0AD';
-        ctx.font='500 '+Math.round(CH*0.038)+'px "Cormorant Garamond", serif';
-        ctx.fillText(dates, CW/2, CH*0.64); ctx.restore(); }
-    }
-    ctx.restore();
+  function downloadBlob(blob,ext){
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    var base=(settings.name?settings.name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-'):'')||'tribute';
+    a.download='EverLight-'+base+'.'+ext;
+    a.href=url; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },6000);
+    return a.download;
   }
 
   function startExport(){
     if(exporting||!photos.length) return;
-    var mime=pickMime();
-    if(!mime){ setNote('This browser can\u2019t record video. Try Chrome, Edge, or Firefox on a computer.'); return; }
-    buildScenes();
+    if(!requireAccess('download')) return;          // gate downloads behind the paywall
     exporting=true; cancelExport=false; pause();
+    buildScenes();                                  // make sure scenes/total reflect current edits
     dlBtn.disabled=true; setNote(''); recBar.style.width='0%';
-    recLabel.textContent='Preparing\u2026'; rec.classList.add('show');
+    recLabel.textContent='Preparing…';
+    recNote.textContent='Building a high-quality MP4, frame by frame, right here on your device.';
+    rec.classList.add('show');
 
-    preloadImages().then(function(imgMap){
-      var ready = (document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
-      return ready.then(function(){ return imgMap; });
-    }).then(function(imgMap){
-      var ctx=recCanvas.getContext('2d'); var CW=recCanvas.width, CH=recCanvas.height;
-      var stream=recCanvas.captureStream(30);
+    var done=function(name,note){
+      exporting=false; rec.classList.remove('show'); dlBtn.disabled=false;
+      if(name) setNote('Saved '+name+(note?'  ·  '+note:''));
+    };
+    var fail=function(msg){
+      exporting=false; rec.classList.remove('show'); dlBtn.disabled=false;
+      setNote(msg||'Something went wrong creating the video.');
+    };
 
-      // audio
-      var haveAudio=false;
-      if(tracks.length){
-        var g=ensureAudioGraph();
-        if(g){ try{ if(g.ctx.state==='suspended') g.ctx.resume(); }catch(e){}
-          var at=g.dest.stream.getAudioTracks()[0]; if(at){ stream.addTrack(at); haveAudio=true; } }
+    exportWebCodecs().then(function(blob){
+      if(cancelExport){ done(null); setNote('Download cancelled.'); return; }
+      if(!blob){ fail('Something went wrong creating the video.'); return; }
+      var name=downloadBlob(blob,'mp4');
+      done(name,'a universal .mp4 that plays on phones, computers and TVs.');
+    }).catch(function(err){
+      if(err&&err.fallback){
+        // Browser lacks WebCodecs (or AAC) — fall back to real-time recording.
+        recNote.textContent='Recording in real time (your browser doesn’t support fast export). Keep this tab in front.';
+        exportMediaRecorder().then(function(out){
+          if(cancelExport||!out){ done(null); setNote('Download cancelled.'); return; }
+          var name=downloadBlob(out.blob,out.ext);
+          done(name, out.ext==='webm' ? '.webm plays in most players; convert to .mp4 if a device won’t open it.' : 'a universal .mp4.');
+        }).catch(function(e){ fail(e&&e.message?e.message:'Something went wrong creating the video.'); });
+      }else{
+        console.error(err);
+        fail('Something went wrong creating the video. '+(err&&err.message?err.message:''));
       }
-
-      var chunks=[]; var recorder;
-      try{ recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000}); }
-      catch(e){ exporting=false; rec.classList.remove('show'); dlBtn.disabled=false; setNote('Couldn\u2019t start the recorder in this browser.'); return; }
-
-      recorder.ondataavailable=function(ev){ if(ev.data&&ev.data.size) chunks.push(ev.data); };
-      recorder.onstop=function(){
-        if(tracks.length){ musicActive=false; try{audio.pause();}catch(e){} }
-        rec.classList.remove('show'); exporting=false; dlBtn.disabled=false;
-        if(cancelExport){ setNote('Download cancelled.'); return; }
-        var ext=(mime.indexOf('mp4')>=0)?'mp4':'webm';
-        var blob=new Blob(chunks,{type:mime.split(';')[0]});
-        var url=URL.createObjectURL(blob); var a=document.createElement('a');
-        var fn=(settings.name?settings.name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-'):'tribute')||'tribute';
-        a.href=url; a.download=fn+'.'+ext; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(function(){ URL.revokeObjectURL(url); },4000);
-        setNote('Saved '+a.download+(ext==='webm'?'  ·  .webm plays in most players; convert to .mp4 if needed.':''));
-      };
-
-      recLabel.textContent='Rendering your tribute\u2026';
-      recorder.start(200);
-      if(haveAudio){ musicActive=true; loadTrack(0); try{audio.currentTime=0;}catch(e){} audio.volume=0; audio.play().catch(function(){}); }
-
-      var startT=performance.now();
-      (function renderLoop(now){
-        if(cancelExport){ try{recorder.stop();}catch(e){} return; }
-        var elapsed=(now-startT)/1000;
-        if(elapsed>=total){
-          drawSceneCanvas(ctx,CW,CH,imgMap,scenes.length-1,scenes[scenes.length-1].dur,1);
-          try{recorder.stop();}catch(e){} return;
-        }
-        var idx=sceneAt(elapsed), sc=scenes[idx], localT=elapsed-sc.start;
-        var fadeWin=Math.min(FADE,sc.dur*0.6), alpha=(localT<fadeWin)?(localT/fadeWin):1;
-        ctx.clearRect(0,0,CW,CH); ctx.fillStyle='#000'; ctx.fillRect(0,0,CW,CH);
-        if(idx>0 && alpha<1) drawSceneCanvas(ctx,CW,CH,imgMap,idx-1,scenes[idx-1].dur,1);
-        drawSceneCanvas(ctx,CW,CH,imgMap,idx,localT,alpha);
-        if(haveAudio){
-          var v=AUDIO_VOL;
-          if(elapsed<AUDIO_IN) v=AUDIO_VOL*(elapsed/AUDIO_IN);
-          else if(elapsed>total-AUDIO_OUT) v=AUDIO_VOL*Math.max(0,(total-elapsed)/AUDIO_OUT);
-          audio.volume=Math.max(0,Math.min(1,v));
-        }
-        recBar.style.width=(elapsed/total*100).toFixed(1)+'%';
-        recLabel.textContent='Rendering your tribute\u2026 '+Math.round(elapsed/total*100)+'%';
-        requestAnimationFrame(renderLoop);
-      })(startT);
-    }).catch(function(){ exporting=false; rec.classList.remove('show'); dlBtn.disabled=false; setNote('Something went wrong preparing the video.'); });
+    });
   }
   dlBtn.addEventListener('click',startExport);
   recCancel.addEventListener('click',function(){ cancelExport=true; });
 
+  // ---------- init ----------
+  $('payAmt').textContent=PRICE_LABEL;
+  $('payGoAmt').textContent=PRICE_LABEL;
+  setTab('guest');
+  applyAccessUI();
   updateButtons();
 })();
 </script>
