@@ -1,0 +1,15 @@
+{
+  "name": "everlight",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EverLight — build an end-of-life tribute video from photos and songs, entirely in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build.mjs",
+    "preview": "vite preview --host"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
