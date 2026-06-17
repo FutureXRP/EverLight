@@ -707,7 +707,7 @@
   // frame-accurate and plays on phones, computers and TVs. MediaRecorder is
   // kept only as a fallback for browsers without WebCodecs.
 
-  var exporting=false, cancelExport=false;
+  var exporting=false, cancelExport=false, exportHadAudio=false;
   var EXP_W=1920, EXP_H=1080, FPS=30, VBITRATE=8000000;
 
   var _muxerMod=null;
@@ -725,6 +725,25 @@
   function fitContain(iw,ih,cw,ch){ var s=Math.min(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
   function fitCover(iw,ih,cw,ch){ var s=Math.max(cw/iw,ch/ih); var dw=iw*s,dh=ih*s; return {dw:dw,dh:dh,dx:(cw-dw)/2,dy:(ch-dh)/2}; }
 
+  // Soft, dark, browser-independent backdrop. We downscale the photo to a tiny
+  // canvas and draw it back up large — the upscaling smoothing gives a clean blur
+  // without ctx.filter (which silently no-ops in some browsers, which made the
+  // sharp cover copy show through and look like the photo was doubled).
+  var _bgSmall=document.createElement('canvas'), _bgCtx=null;
+  function drawBlurBg(ctx,img,CW,CH){
+    if(!_bgCtx) _bgCtx=_bgSmall.getContext('2d');
+    var sw=64, sh=Math.max(1,Math.round(sw*CH/CW));
+    if(_bgSmall.width!==sw||_bgSmall.height!==sh){ _bgSmall.width=sw; _bgSmall.height=sh; }
+    var cov=fitCover(img.width,img.height,sw,sh);
+    _bgCtx.clearRect(0,0,sw,sh);
+    _bgCtx.drawImage(img,cov.dx,cov.dy,cov.dw,cov.dh);
+    var sm=ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled=true; try{ctx.imageSmoothingQuality='high';}catch(e){}
+    ctx.drawImage(_bgSmall,-CW*0.04,-CH*0.04,CW*1.08,CH*1.08);
+    ctx.imageSmoothingEnabled=sm;
+    ctx.fillStyle='rgba(8,9,13,0.58)'; ctx.fillRect(0,0,CW,CH);   // darken to an ambient wash
+  }
+
   // Draw one scene onto a 2D context (shared by export + the small preview).
   function drawSceneCanvas(ctx,CW,CH,imgMap,idx,localT,ga){
     var sc=scenes[idx]; ctx.save(); ctx.globalAlpha=ga;
@@ -732,10 +751,8 @@
       var img=imgMap[sc.photo.id];
       ctx.fillStyle='#0b0c11'; ctx.fillRect(0,0,CW,CH);
       if(img){
-        try{ ctx.filter='blur(22px) brightness(0.42)'; }catch(e){}
-        var cov=fitCover(img.width,img.height,CW,CH);
-        ctx.drawImage(img,cov.dx-CW*0.06,cov.dy-CH*0.06,cov.dw*1.12,cov.dh*1.12);
-        ctx.filter='none';
+        drawBlurBg(ctx,img,CW,CH);
+        // the single sharp copy of the photo, with the ken-burns drift
         var p=kb(idx); var f=sc.dur>0?Math.min(1,localT/sc.dur):1;
         var s=settings.kb?(p.s0+(p.s1-p.s0)*f):1.04;
         var px=settings.kb?(p.x0+(p.x1-p.x0)*f):0, py=settings.kb?(p.y0+(p.y1-p.y0)*f):0;
@@ -811,36 +828,59 @@
     });
   }
 
-  // Render all songs into one mixed PCM buffer (with fades) using OfflineAudioContext.
+  // decodeAudioData with broad support: prefer the promise form, fall back to the
+  // older callback form, and never reject (returns null on failure).
+  function decodeAudio(ctx,arrayBuffer){
+    return new Promise(function(res){
+      var settled=false, done=function(b){ if(!settled){ settled=true; res(b||null); } };
+      try{
+        var p=ctx.decodeAudioData(arrayBuffer,function(b){done(b);},function(){done(null);});
+        if(p&&typeof p.then==='function') p.then(function(b){done(b);},function(){done(null);});
+      }catch(e){ done(null); }
+    });
+  }
+
+  // Mix all songs into one PCM buffer (in order, with fades). Decodes with a normal
+  // AudioContext (most reliable decoder), then renders the mix offline. Returns null
+  // if no song could be decoded, so the caller can avoid muxing a silent track.
   function renderMixedAudio(totalDur){
     var sr=48000;
-    var len=Math.max(1,Math.ceil(totalDur*sr));
     var OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
-    if(!OAC) return Promise.resolve(null);
-    var octx=new OAC(2,len,sr);
-    var master=octx.createGain();
-    var g=master.gain, VOL=AUDIO_VOL;
-    g.setValueAtTime(0,0);
-    g.linearRampToValueAtTime(VOL,Math.min(AUDIO_IN,totalDur));
-    var outStart=Math.max(Math.min(AUDIO_IN,totalDur),totalDur-AUDIO_OUT);
-    g.setValueAtTime(VOL,outStart);
-    g.linearRampToValueAtTime(0,totalDur);
-    master.connect(octx.destination);
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!OAC||!AC||!tracks.length) return Promise.resolve(null);
+    var decodeCtx;
+    try{ decodeCtx=new AC(); }catch(e){ return Promise.resolve(null); }
 
-    var off=0, chain=Promise.resolve();
-    tracks.forEach(function(tk){
-      chain=chain.then(function(){
-        if(off>=totalDur) return;
-        return fetch(tk.url).then(function(r){return r.arrayBuffer();}).then(function(buf){
-          return octx.decodeAudioData(buf.slice(0));
-        }).then(function(decoded){
-          var s=octx.createBufferSource(); s.buffer=decoded; s.connect(master);
-          try{ s.start(off); }catch(e){}
-          off+=decoded.duration;
-        }).catch(function(){ /* skip undecodable track */ });
+    // decode every track up front (Promise.all preserves track order)
+    return Promise.all(tracks.map(function(tk){
+      return fetch(tk.url)
+        .then(function(r){ return r.arrayBuffer(); })
+        .then(function(ab){ return decodeAudio(decodeCtx,ab); })
+        .catch(function(){ return null; });
+    })).then(function(buffers){
+      try{ decodeCtx.close(); }catch(e){}
+      if(!buffers.some(Boolean)) return null;          // genuinely nothing decodable
+
+      var len=Math.max(1,Math.ceil(totalDur*sr));
+      var octx=new OAC(2,len,sr);
+      var master=octx.createGain();
+      var g=master.gain, VOL=AUDIO_VOL;
+      g.setValueAtTime(0,0);
+      g.linearRampToValueAtTime(VOL,Math.min(AUDIO_IN,totalDur));
+      var outStart=Math.max(Math.min(AUDIO_IN,totalDur),totalDur-AUDIO_OUT);
+      g.setValueAtTime(VOL,outStart);
+      g.linearRampToValueAtTime(0,totalDur);
+      master.connect(octx.destination);
+
+      var off=0;
+      buffers.forEach(function(buf){
+        if(!buf||off>=totalDur) return;
+        var s=octx.createBufferSource(); s.buffer=buf; s.connect(master);
+        try{ s.start(off); }catch(e){}
+        off+=buf.duration;
       });
-    });
-    return chain.then(function(){ return octx.startRendering(); });
+      return octx.startRendering();
+    }).catch(function(){ return null; });
   }
 
   function encodeAudio(buf,muxer){
@@ -892,7 +932,7 @@
         });
       });
     }).then(function(b){
-      audioBuffer=b; wantAudio=!!b;
+      audioBuffer=b; wantAudio=!!b; exportHadAudio=wantAudio;
 
       var Muxer=mod.Muxer, ArrayBufferTarget=mod.ArrayBufferTarget;
       var muxOpts={
@@ -1034,7 +1074,7 @@
   function startExport(){
     if(exporting||!photos.length) return;
     if(!requireAccess('download')) return;          // gate downloads behind the paywall
-    exporting=true; cancelExport=false; pause();
+    exporting=true; cancelExport=false; exportHadAudio=false; pause();
     buildScenes();                                  // make sure scenes/total reflect current edits
     dlBtn.disabled=true; setNote(''); recBar.style.width='0%';
     recLabel.textContent='Preparing…';
@@ -1054,7 +1094,10 @@
       if(cancelExport){ done(null); setNote('Download cancelled.'); return; }
       if(!blob){ fail('Something went wrong creating the video.'); return; }
       var name=downloadBlob(blob,'mp4');
-      done(name,'a universal .mp4 that plays on phones, computers and TVs.');
+      if(tracks.length && !exportHadAudio)
+        done(name,'a universal .mp4 — but the songs couldn’t be read on this device, so it saved without music. Try Chrome or Edge.');
+      else
+        done(name,'a universal .mp4'+(tracks.length?' with music':'')+' that plays on phones, computers and TVs.');
     }).catch(function(err){
       if(err&&err.fallback){
         // Browser lacks WebCodecs (or AAC) — fall back to real-time recording.
