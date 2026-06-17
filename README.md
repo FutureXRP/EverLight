@@ -43,5 +43,9 @@ It's a static site. `npm run build` emits `dist/`, or just drop `everlight.html`
 
 - **Checkout is simulated.** The paywall flow works end-to-end but does not charge
   anyone. Wire a real provider (e.g. Stripe Checkout) into the `processPayment()`
-  function in `everlight.html`. Unlock state is stored client-side in
-  `localStorage`; real revenue protection needs server-side verification.
+  function in `everlight.html`.
+- **One purchase per video.** Each tribute is unlocked individually, tied to the
+  exact set of photos + songs in the current build (changing them makes a new
+  video that must be paid for again). The unlock lives in memory only and is not
+  persisted. Real revenue protection needs server-side verification and protected
+  delivery of the finished file.

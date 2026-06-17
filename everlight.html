@@ -261,7 +261,7 @@
   <div class="exportnote" id="exportNote"></div>
   <div class="unlock-pill" id="unlockPill">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-    Unlocked — watch and download anytime on this device
+    Unlocked — watch and download this tribute
   </div>
 
   <div class="panels">
@@ -380,7 +380,6 @@
 
   // ---------- product / pricing ----------
   var PRICE_LABEL='$19';          // change to set your price label
-  var ACCESS_KEY='everlight_access_v1';
 
   // ---------- state ----------
   var photos=[];           // {id,url,caption}
@@ -559,6 +558,7 @@
     var has=photos.length>0;
     playBtn.disabled=!has; restartBtn.disabled=!has; fsBtn.disabled=!has; dlBtn.disabled=!has;
     empty.style.display=has?'none':'flex';
+    applyAccessUI();   // a changed photo set may re-lock (each video is its own purchase)
   }
   function setNote(t){ exportNote.textContent=t||''; }
 
@@ -768,6 +768,7 @@
   }
   musicInput.addEventListener('change',function(e){ addMusicFiles(e.target.files); musicInput.value=''; });
   function renderTracks(){
+    applyAccessUI();   // changing songs makes it a different video → may re-lock
     trackList.innerHTML='';
     tracks.forEach(function(tk,i){
       var row=document.createElement('div'); row.className='track';
@@ -804,25 +805,31 @@
   // ================= PAYWALL =================
   var payModal=$('payModal'),payClose=$('payClose'),payGo=$('payGo'),payErr=$('payErr');
   var guestEmail=$('guestEmail'),signinEmail=$('signinEmail'),signinPass=$('signinPass');
-  var access=loadAccess();   // {paid:bool, email, ts, mode}
   var pendingAction=null;    // 'play' | 'present' | 'download'
   var currentTab='guest';
+  var paidSig=null;          // signature of the tribute that has been paid for (this build)
+  var lastEmail='';          // remembered to prefill the form on repeat purchases
 
-  function loadAccess(){
-    try{ var a=JSON.parse(localStorage.getItem(ACCESS_KEY)); if(a&&a.paid) return a; }catch(e){}
-    return {paid:false};
+  // Each tribute is its own purchase. The unlock is tied to the photos + songs
+  // currently loaded, so a *different* video (photos/songs added, removed or
+  // swapped) must be paid for again. It is intentionally NOT persisted across
+  // reloads: the photos themselves don't persist, so neither should the unlock.
+  function tributeSig(){
+    var ids=function(arr){ return arr.map(function(o){return o.id;}).sort(function(a,b){return a-b;}).join(','); };
+    return 'p['+ids(photos)+']t['+ids(tracks)+']';
   }
-  function saveAccess(){ try{ localStorage.setItem(ACCESS_KEY,JSON.stringify(access)); }catch(e){} }
+  function isUnlocked(){ return paidSig!==null && photos.length>0 && paidSig===tributeSig(); }
 
-  // Gate: returns true if already unlocked, otherwise opens the paywall and returns false.
+  // Gate: returns true if *this exact tribute* is unlocked, else opens the paywall.
   function requireAccess(action){
-    if(access.paid) return true;
+    if(isUnlocked()) return true;
     openPaywall(action);
     return false;
   }
   function openPaywall(action){
     pendingAction=action||null;
     payErr.textContent='';
+    if(lastEmail){ if(!guestEmail.value) guestEmail.value=lastEmail; if(!signinEmail.value) signinEmail.value=lastEmail; }
     payModal.classList.add('show'); payModal.setAttribute('aria-hidden','false');
     var f=currentTab==='guest'?guestEmail:signinEmail;
     setTimeout(function(){ try{ f.focus(); }catch(e){} },60);
@@ -844,6 +851,7 @@
 
   payGo.addEventListener('click',function(){ doPay(); });
   function doPay(){
+    primeAudio();   // we're inside a real user gesture — wake the audio engine now so capture works after payment
     var email;
     if(currentTab==='guest'){
       email=(guestEmail.value||'').trim();
@@ -855,8 +863,7 @@
     payErr.textContent='';
     var orig=payGo.innerHTML; payGo.disabled=true; payGo.textContent='Processing…';
     processPayment({email:email,mode:currentTab,amount:PRICE_LABEL}).then(function(){
-      access={paid:true,email:email,ts:Date.now(),mode:currentTab};
-      saveAccess(); applyAccessUI();
+      paidSig=tributeSig(); lastEmail=email; applyAccessUI();   // unlocks THIS tribute only
       payGo.textContent='✓ Unlocked';
       setTimeout(function(){
         closePaywall(); payGo.disabled=false; payGo.innerHTML=orig;
@@ -885,8 +892,9 @@
     else if(a==='download') startExport();
   }
   function applyAccessUI(){
-    lockBadge.classList.toggle('hide',!!access.paid);
-    unlockPill.classList.toggle('show',!!access.paid);
+    var u=isUnlocked();
+    lockBadge.classList.toggle('hide', u || photos.length===0);
+    unlockPill.classList.toggle('show', u);
   }
 
   // ================= EXPORT (accurate MP4) =================
@@ -902,7 +910,9 @@
   var _muxerMod=null;
   function loadMuxer(){
     if(_muxerMod) return _muxerMod;
-    _muxerMod=import('https://esm.sh/mp4-muxer@5.2.1');
+    // try esm.sh, then jsDelivr, so a single blocked CDN doesn't drop us to the fallback recorder
+    _muxerMod=import('https://esm.sh/mp4-muxer@5.2.1')
+      .catch(function(){ return import('https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/+esm'); });
     return _muxerMod;
   }
 
@@ -1122,6 +1132,7 @@
       });
     }).then(function(b){
       audioBuffer=b; wantAudio=!!b; exportHadAudio=wantAudio;
+      try{ console.info('[EverLight] path=WebCodecs/MP4 · songs='+tracks.length+' · musicIncluded='+wantAudio); }catch(e){}
 
       var Muxer=mod.Muxer, ArrayBufferTarget=mod.ArrayBufferTarget;
       var muxOpts={
@@ -1180,6 +1191,19 @@
   }
 
   // Fallback: real-time MediaRecorder (used only when WebCodecs is unavailable).
+  // A single AudioContext, woken on a user gesture (Pay / Download click) so the
+  // real-time recorder can actually capture sound even though export runs a moment
+  // after the click. Browsers keep a context "running" once resumed under a gesture.
+  var sharedAC=null;
+  function primeAudio(){
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+      if(!sharedAC) sharedAC=new AC();
+      if(sharedAC.state==='suspended') sharedAC.resume();
+    }catch(e){}
+    return sharedAC;
+  }
+
   var audioGraph=null;
   function pickMime(){
     if(typeof MediaRecorder==='undefined'||!MediaRecorder.isTypeSupported) return null;
@@ -1190,9 +1214,9 @@
   }
   function ensureAudioGraph(){
     if(audioGraph) return audioGraph;
-    var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+    var ctx=primeAudio(); if(!ctx) return null;
     try{
-      var ctx=new AC(); var src=ctx.createMediaElementSource(audio);
+      var src=ctx.createMediaElementSource(audio);
       var dest=ctx.createMediaStreamDestination();
       src.connect(ctx.destination); src.connect(dest);
       audioGraph={ctx:ctx,src:src,dest:dest};
@@ -1225,8 +1249,9 @@
           if(tracks.length){ musicActive=false; try{audio.pause();}catch(e){} }
           if(cancelExport){ resolve(null); return; }
           var ext=(mime.indexOf('mp4')>=0)?'mp4':'webm';
-          resolve({blob:new Blob(chunks,{type:mime.split(';')[0]}),ext:ext});
+          resolve({blob:new Blob(chunks,{type:mime.split(';')[0]}),ext:ext,audio:haveAudio});
         };
+        try{ console.info('[EverLight] path=MediaRecorder/'+mime+' · songs='+tracks.length+' · musicCaptured='+haveAudio); }catch(e){}
         recLabel.textContent='Rendering your tribute…';
         recorder.start(200);
         if(haveAudio){ musicActive=true; loadTrack(0); try{audio.currentTime=0;}catch(e){} audio.volume=0; audio.play().catch(function(){}); }
@@ -1294,7 +1319,8 @@
         exportMediaRecorder().then(function(out){
           if(cancelExport||!out){ done(null); setNote('Download cancelled.'); return; }
           var name=downloadBlob(out.blob,out.ext);
-          done(name, out.ext==='webm' ? '.webm plays in most players; convert to .mp4 if a device won’t open it.' : 'a universal .mp4.');
+          var music=(tracks.length? (out.audio?' with music':' — but no music was captured (try Chrome or Edge)'):'');
+          done(name, (out.ext==='webm' ? 'compatibility .webm'+music+' — plays in most players; convert to .mp4 if a device won’t open it.' : 'compatibility .mp4'+music+'.'));
         }).catch(function(e){ fail(e&&e.message?e.message:'Something went wrong creating the video.'); });
       }else{
         console.error(err);
@@ -1302,7 +1328,7 @@
       }
     });
   }
-  dlBtn.addEventListener('click',startExport);
+  dlBtn.addEventListener('click',function(){ primeAudio(); startExport(); });
   recCancel.addEventListener('click',function(){ cancelExport=true; });
 
   // ---------- init ----------
