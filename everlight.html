@@ -122,6 +122,23 @@
   .thumb .move button:disabled{opacity:.3}
   .thumb .move button+button{border-left:1px solid var(--line)}
 
+  /* sort bar */
+  .sortbar{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .sortbar .lab{font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+  .sortbar select{background:var(--bg-3);border:1px solid var(--line);color:var(--text);font-family:var(--ui);font-size:13.5px;padding:8px 30px 8px 11px;border-radius:9px;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA0AD' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 9px center}
+  .sortbar select:focus{outline:none;border-color:var(--gold)}
+  .sortbar .sortnote{font-size:12px;color:var(--muted-2)}
+
+  /* drag-to-reorder */
+  .thumb .ph{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+  .thumb .ph:active{cursor:grabbing}
+  .thumb.dragging{opacity:.32}
+  .thumb.dragover-target{outline:2px dashed var(--gold);outline-offset:-2px}
+  .thumb-clone{position:fixed;left:0;top:0;z-index:80;pointer-events:none;border-radius:10px;overflow:hidden;box-shadow:0 18px 50px -12px rgba(0,0,0,.75);opacity:.95;transform:scale(1.04);will-change:left,top}
+  .thumb .ph .grip{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);display:flex;gap:2px;padding:3px 7px;border-radius:99px;background:rgba(0,0,0,.5);opacity:0;transition:opacity .15s;pointer-events:none}
+  .thumb .ph:hover .grip{opacity:.85}
+  .thumb .ph .grip i{width:3px;height:3px;border-radius:50%;background:#fff;display:block}
+
   .filebtn{position:relative;overflow:hidden}
   .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
 
@@ -251,11 +268,21 @@
 
     <div class="panel full">
       <h3>Photographs</h3>
-      <p class="hint">Tap to choose from your camera roll, photo library, or files — or drag images in. Reorder them into the story you want to tell.</p>
+      <p class="hint">Tap to choose from your camera roll, photo library, or files — or drag images in. Then press and hold any photo to drag it into place.</p>
       <label class="drop" id="drop">
         <strong>Add photographs</strong> &nbsp;·&nbsp; choose or drag &amp; drop
         <input type="file" id="photoInput" accept="image/*" multiple>
       </label>
+      <div class="sortbar" id="sortbar" hidden>
+        <span class="lab">Sort by</span>
+        <select id="sortSel" aria-label="Sort photographs by">
+          <option value="manual">Manual order</option>
+          <option value="date-asc">Date taken · oldest first</option>
+          <option value="date-desc">Date taken · newest first</option>
+          <option value="name">File name</option>
+        </select>
+        <span class="sortnote" id="sortNote"></span>
+      </div>
       <div class="thumbs" id="thumbs"></div>
     </div>
 
@@ -367,6 +394,7 @@
   var $=function(id){return document.getElementById(id);};
   var stage=$('stage'),slotA=$('slotA'),slotB=$('slotB'),empty=$('empty');
   var thumbs=$('thumbs'),drop=$('drop'),photoInput=$('photoInput');
+  var sortbar=$('sortbar'),sortSel=$('sortSel'),sortNote=$('sortNote');
   var musicInput=$('musicInput'),musicTotal=$('musicTotal'),trackList=$('trackList');
   var audio=$('audio');
   var playBtn=$('playBtn'),playLabel=$('playLabel'),restartBtn=$('restartBtn'),fsBtn=$('fsBtn'),dlBtn=$('dlBtn');
@@ -535,34 +563,195 @@
   function setNote(t){ exportNote.textContent=t||''; }
 
   // ---------- photos ----------
+  var currentSort='manual';
+
   function addPhotoFiles(files){
     Array.prototype.slice.call(files).filter(function(f){return /^image\//.test(f.type);})
-      .forEach(function(f){ photos.push({id:nextId++,url:URL.createObjectURL(f),caption:''}); });
-    renderThumbs(); updateButtons();
+      .forEach(function(f){
+        var p={id:nextId++,url:URL.createObjectURL(f),caption:'',name:f.name||'',lastModified:f.lastModified||0,date:null};
+        photos.push(p);
+        extractPhotoDate(f).then(function(d){
+          p.date=d;
+          // if a date sort is active, slot newly-dated photos into place
+          if(currentSort.indexOf('date')===0){ applySort(); renderThumbs(); }
+          else updateSortUI();
+        });
+      });
+    applySort(); renderThumbs(); updateButtons();
   }
   photoInput.addEventListener('change',function(e){ addPhotoFiles(e.target.files); photoInput.value=''; });
   drop.addEventListener('dragover',function(e){ e.preventDefault(); drop.classList.add('over'); });
   drop.addEventListener('dragleave',function(){ drop.classList.remove('over'); });
   drop.addEventListener('drop',function(e){ e.preventDefault(); drop.classList.remove('over'); if(e.dataTransfer.files) addPhotoFiles(e.dataTransfer.files); });
-  function renderThumbs(){
+
+  // ----- sorting -----
+  function photoTime(p){ return (p.date!=null)?p.date:(p.lastModified||0); }
+  function applySort(){
+    if(currentSort==='manual') return;
+    if(currentSort==='name'){
+      photos.sort(function(a,b){ return (a.name||'').localeCompare(b.name||'', undefined, {numeric:true,sensitivity:'base'}); });
+    }else{ // date-asc / date-desc
+      photos.sort(function(a,b){ return photoTime(a)-photoTime(b); });
+      if(currentSort==='date-desc') photos.reverse();
+    }
+  }
+  function setSort(mode,fromDrag){
+    currentSort=mode; if(sortSel.value!==mode) sortSel.value=mode;
+    if(!fromDrag){ applySort(); renderThumbs(); }
+    updateSortUI();
+  }
+  function updateSortUI(){
+    sortbar.hidden = photos.length<2;
+    var note='';
+    if(currentSort.indexOf('date')===0){
+      var missing=photos.filter(function(p){return p.date==null;}).length;
+      if(missing) note=missing+' of '+photos.length+' had no date — placed by file time.';
+    }
+    sortNote.textContent=note;
+  }
+  sortSel.addEventListener('change',function(){ setSort(sortSel.value,false); });
+
+  // ----- minimal, dependency-free EXIF "date taken" reader (JPEG) -----
+  function extractPhotoDate(file){
+    return new Promise(function(res){
+      if(!/jpe?g/i.test(file.type) && !/\.jpe?g$/i.test(file.name||'')){ res(null); return; }
+      var fr=new FileReader();
+      fr.onerror=function(){ res(null); };
+      fr.onload=function(){ try{ res(parseExifDate(new DataView(fr.result))); }catch(e){ res(null); } };
+      fr.readAsArrayBuffer(file.slice(0, 256*1024)); // EXIF lives near the start
+    });
+  }
+  function parseExifDate(view){
+    if(view.byteLength<4 || view.getUint16(0)!==0xFFD8) return null; // not JPEG
+    var off=2, len=view.byteLength;
+    while(off+4<=len){
+      var marker=view.getUint16(off); off+=2;
+      if(marker===0xFFDA || marker===0xFFD9) break;               // start-of-scan / end
+      var size=view.getUint16(off); if(size<2) break;
+      if(marker===0xFFE1){                                         // APP1 (Exif)
+        var b=off+2;
+        if(b+6<=len && view.getUint32(b)===0x45786966 && view.getUint16(b+4)===0x0000) return parseTiffDate(view,b+6);
+      }
+      off+=size;
+    }
+    return null;
+  }
+  function parseTiffDate(view,t){
+    var bo=view.getUint16(t), le;
+    if(bo===0x4949) le=true; else if(bo===0x4D4D) le=false; else return null;
+    function u16(o){ return view.getUint16(o,le); }
+    function u32(o){ return view.getUint32(o,le); }
+    if(u16(t+2)!==0x002A) return null;
+    function readIFD(o){
+      var n=u16(o), m={};
+      for(var i=0;i<n;i++){ var e=o+2+i*12; m[u16(e)]={count:u32(e+4),valOff:e+8}; }
+      return m;
+    }
+    function ascii(entry){
+      var c=entry.count, o=(c<=4)?entry.valOff:(t+u32(entry.valOff)), s='';
+      for(var i=0;i<c;i++){ var ch=view.getUint8(o+i); if(ch===0) break; s+=String.fromCharCode(ch); }
+      return s;
+    }
+    var ifd0=readIFD(t+u32(t+4)), str=null;
+    if(ifd0[0x8769]){                                             // Exif sub-IFD
+      var ex=readIFD(t+u32(ifd0[0x8769].valOff));
+      if(ex[0x9003]) str=ascii(ex[0x9003]);                       // DateTimeOriginal
+      else if(ex[0x9004]) str=ascii(ex[0x9004]);                  // DateTimeDigitized
+    }
+    if(!str && ifd0[0x0132]) str=ascii(ifd0[0x0132]);             // DateTime
+    var m=str && /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(str);
+    return m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime() : null;
+  }
+
+  function renderThumbs(keepDrag){
     thumbs.innerHTML='';
     photos.forEach(function(p,i){
-      var t=document.createElement('div'); t.className='thumb';
+      var t=document.createElement('div'); t.className='thumb'; t.setAttribute('data-idx',i);
+      if(keepDrag && dragState && dragState.index===i) t.classList.add('dragging');
       var ph=document.createElement('div'); ph.className='ph'; ph.style.backgroundImage='url("'+p.url+'")';
       var idx=document.createElement('div'); idx.className='idx'; idx.textContent=(i+1);
       var x=document.createElement('button'); x.className='x'; x.innerHTML='&times;'; x.title='Remove';
-      x.addEventListener('click',function(){ URL.revokeObjectURL(p.url); photos.splice(i,1); renderThumbs(); updateButtons(); });
-      ph.appendChild(idx); ph.appendChild(x);
+      x.addEventListener('click',function(){ URL.revokeObjectURL(p.url); photos.splice(i,1); renderThumbs(); updateButtons(); updateSortUI(); });
+      var grip=document.createElement('div'); grip.className='grip'; grip.innerHTML='<i></i><i></i><i></i>';
+      ph.appendChild(idx); ph.appendChild(x); ph.appendChild(grip);
+      ph.addEventListener('pointerdown',function(e){ startThumbDrag(e,i,t); });
       var cap=document.createElement('input'); cap.type='text'; cap.placeholder='A few words…'; cap.value=p.caption; cap.maxLength=80;
       cap.addEventListener('input',function(){ p.caption=cap.value; });
       var mv=document.createElement('div'); mv.className='move';
       var up=document.createElement('button'); up.innerHTML='&#8592; earlier'; up.disabled=(i===0);
-      up.addEventListener('click',function(){ photos.splice(i-1,0,photos.splice(i,1)[0]); renderThumbs(); });
+      up.addEventListener('click',function(){ photos.splice(i-1,0,photos.splice(i,1)[0]); setSort('manual',true); renderThumbs(); });
       var dn=document.createElement('button'); dn.innerHTML='later &#8594;'; dn.disabled=(i===photos.length-1);
-      dn.addEventListener('click',function(){ photos.splice(i+1,0,photos.splice(i,1)[0]); renderThumbs(); });
+      dn.addEventListener('click',function(){ photos.splice(i+1,0,photos.splice(i,1)[0]); setSort('manual',true); renderThumbs(); });
       mv.appendChild(up); mv.appendChild(dn);
       t.appendChild(ph); t.appendChild(cap); t.appendChild(mv); thumbs.appendChild(t);
     });
+    updateSortUI();
+  }
+
+  // ----- press-and-hold drag reordering (mouse + touch via Pointer Events) -----
+  var dragState=null;
+  function startThumbDrag(e,index,thumbEl){
+    if((e.button!=null && e.button!==0) || (e.target && e.target.closest && e.target.closest('.x'))) return;
+    dragState={index:index, startX:e.clientX, startY:e.clientY, moved:false, clone:null,
+               w:thumbEl.offsetWidth, h:thumbEl.offsetHeight, srcUrl:photos[index]&&photos[index].url};
+    window.addEventListener('pointermove',onThumbDragMove,{passive:false});
+    window.addEventListener('pointerup',endThumbDrag);
+    window.addEventListener('pointercancel',endThumbDrag);
+  }
+  function onThumbDragMove(e){
+    if(!dragState) return;
+    var dx=e.clientX-dragState.startX, dy=e.clientY-dragState.startY;
+    if(!dragState.moved){
+      if(Math.abs(dx)+Math.abs(dy)<6) return;     // tap threshold — don't hijack quick taps
+      dragState.moved=true;
+      beginClone(); document.body.style.userSelect='none';
+      renderThumbs(true);
+    }
+    e.preventDefault();
+    positionClone(e); autoScroll(e);
+    var target=indexFromPoint(e.clientX,e.clientY);
+    if(target!=null && target!==dragState.index){
+      photos.splice(target,0,photos.splice(dragState.index,1)[0]);
+      dragState.index=target;
+      setSort('manual',true);                     // manual drag overrides any sort
+      renderThumbs(true);
+    }
+  }
+  function endThumbDrag(){
+    window.removeEventListener('pointermove',onThumbDragMove,{passive:false});
+    window.removeEventListener('pointerup',endThumbDrag);
+    window.removeEventListener('pointercancel',endThumbDrag);
+    document.body.style.userSelect='';
+    if(dragState){
+      if(dragState.clone&&dragState.clone.parentNode) dragState.clone.parentNode.removeChild(dragState.clone);
+      var moved=dragState.moved; dragState=null;
+      if(moved) renderThumbs();
+    }
+  }
+  function beginClone(){
+    var c=document.createElement('div'); c.className='thumb-clone';
+    c.style.width=dragState.w+'px'; c.style.height=Math.round(dragState.w)+'px';
+    c.style.backgroundImage='url("'+dragState.srcUrl+'")'; c.style.backgroundSize='cover'; c.style.backgroundPosition='center';
+    document.body.appendChild(c); dragState.clone=c;
+  }
+  function positionClone(e){
+    if(!dragState.clone) return;
+    dragState.clone.style.left=(e.clientX-dragState.w/2)+'px';
+    dragState.clone.style.top=(e.clientY-dragState.w/2)+'px';
+  }
+  function indexFromPoint(x,y){
+    var el=document.elementFromPoint(x,y);
+    while(el && el!==thumbs && !(el.classList&&el.classList.contains('thumb'))) el=el.parentElement;
+    if(el && el.classList && el.classList.contains('thumb')){
+      var idx=parseInt(el.getAttribute('data-idx'),10);
+      return isNaN(idx)?null:idx;
+    }
+    return null;
+  }
+  function autoScroll(e){
+    var margin=72, speed=16;
+    if(e.clientY<margin) window.scrollBy(0,-speed);
+    else if(e.clientY>window.innerHeight-margin) window.scrollBy(0,speed);
   }
 
   // ---------- tracks ----------
